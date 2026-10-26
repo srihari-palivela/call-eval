@@ -1,0 +1,37 @@
+# PostgreSQL plus the app (API, workers, scheduler and console in one process).
+# Put keys in .env next to this file (see .env.example), then: docker compose up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: calleval
+      POSTGRES_PASSWORD: calleval
+      POSTGRES_DB: calleval
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calleval -d calleval"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://calleval:calleval@db:5432/calleval
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8787}
+    ports:
+      - "8787:8787"
+    volumes:
+      - appdata:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

@@ -1,0 +1,35 @@
+{
+  "name": "@calleval/web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"web: no unit tests\""
+  },
+  "dependencies": {
+    "@mantine/charts": "7.17.8",
+    "@mantine/core": "7.17.8",
+    "@mantine/dropzone": "7.17.8",
+    "@mantine/hooks": "7.17.8",
+    "@mantine/notifications": "7.17.8",
+    "@tabler/icons-react": "3.31.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "2.15.4",
+    "@calleval/framework": "*"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "postcss": "8.4.49",
+    "postcss-preset-mantine": "1.17.0",
+    "postcss-simple-vars": "7.0.1",
+    "typescript": "5.9.3",
+    "vite": "5.4.11"
+  }
+}

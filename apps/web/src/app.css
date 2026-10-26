@@ -1,0 +1,20 @@
+/* App-level basics on top of Mantine's tokens. */
+body { background: var(--mantine-color-body); font-variant-numeric: tabular-nums; }
+.mantine-NavLink-root[data-active] { font-weight: 600; }
+.tabular { font-variant-numeric: tabular-nums; }
+.cell-btn { transition: transform 80ms ease, box-shadow 80ms ease; }
+.cell-btn:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--mantine-color-ink-5); }
+.turn-row { transition: background-color 120ms ease; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Text and icons on filled surfaces follow the scheme (light fill in dark mode, dark fill in light mode). */
+:root .mantine-Checkbox-root, :root .mantine-Radio-root, :root .mantine-Stepper-root, :root .mantine-Timeline-root,
+:root .mantine-Tabs-root, :root .mantine-Chip-root, :root .mantine-Indicator-root {
+  --checkbox-icon-color: var(--filled-text);
+  --radio-icon-color: var(--filled-text);
+  --stepper-icon-color: var(--filled-text);
+  --tl-icon-color: var(--filled-text);
+  --tabs-text-color: var(--filled-text);
+  --chip-icon-color: var(--filled-text);
+  --indicator-text-color: var(--filled-text);
+}
