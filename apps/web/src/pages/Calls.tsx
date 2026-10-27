@@ -7,6 +7,7 @@ import { bandOf, usePal } from '../theme';
 import { apiSend, errMsg, filterQs, useApi } from '../api';
 import { AgentSelect, Bar, BandBadge, DirectionSelect, EmptyState, ErrorState, Loading, Mono, PageHeader, RangeSelect, SectionTitle, VersionSelect, fmtDuration, fmtWhen, useLookups } from '../components/ui';
 import { useMeta, useStore } from '../store';
+import { NeedsTip, useCan } from '../components/access';
 
 const fmtTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const PAGE = 12;
@@ -115,6 +116,7 @@ function CallDetail({ call, reload }: { call: CallDetailDTO; reload: () => void 
   const p = usePal();
   const { go } = useStore();
   const meta = useMeta();
+  const can = useCan();
   const [phase, setPhase] = useState('all');
   const [focus, setFocus] = useState<string | null>(null);
   const [only, setOnly] = useState(false);
@@ -164,7 +166,7 @@ function CallDetail({ call, reload }: { call: CallDetailDTO; reload: () => void 
           </Stack>
           <Group gap="xs">
             {call.judgeMode && <Badge variant="light" color="gray" tt="none">{call.judgeMode === 'llm' ? 'Scored by the LLM judge' : 'Scored by heuristics'}</Badge>}
-            <Button size="xs" variant="default" leftSection={<IconRefresh size={14} />} loading={busy} onClick={reevaluate}>Re-evaluate</Button>
+            <NeedsTip perm="quality:manage"><Button size="xs" variant="default" leftSection={<IconRefresh size={14} />} loading={busy} disabled={!can('quality:manage')} onClick={reevaluate}>Re-evaluate</Button></NeedsTip>
           </Group>
         </Group>
         <SimpleGrid cols={{ base: 1, md: 3 }} spacing="xl">

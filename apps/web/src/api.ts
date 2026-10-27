@@ -14,13 +14,19 @@ function token(): string | null {
   try { return window.localStorage.getItem('calleval.token'); } catch { return null; }
 }
 
+// The API refuses cookie-authenticated changes without this header (a cross-site page can't set it).
 function headers(json: boolean): Record<string, string> {
-  const h: Record<string, string> = { Accept: 'application/json' };
+  const h: Record<string, string> = { Accept: 'application/json', 'X-CallEval-Client': 'console' };
   if (json) h['Content-Type'] = 'application/json';
   const t = token();
   if (t) h.Authorization = `Bearer ${t}`;
   return h;
 }
+
+/** Fired when a request comes back 401 outside the sign-in routes: the session ended, so the auth gate shows sign-in. */
+export const UNAUTHORIZED_EVENT = 'calleval:unauthorized';
+/** Fired when a request comes back 402: the plan or the credit doesn't allow it, so the shell points to Billing. */
+export const PAYMENT_REQUIRED_EVENT = 'calleval:payment-required';
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -29,6 +35,12 @@ async function handle<T>(res: Response): Promise<T> {
       const body = await res.json();
       msg = body?.message || body?.error || msg;
     } catch { /* not JSON */ }
+    if (res.status === 401 && !new URL(res.url, window.location.href).pathname.startsWith('/api/auth/')) {
+      try { window.dispatchEvent(new Event(UNAUTHORIZED_EVENT)); } catch { /* no window */ }
+    }
+    if (res.status === 402) {
+      try { window.dispatchEvent(new CustomEvent(PAYMENT_REQUIRED_EVENT, { detail: msg })); } catch { /* no window */ }
+    }
     throw new ApiError(res.status, msg);
   }
   if (res.status === 204) return undefined as T;

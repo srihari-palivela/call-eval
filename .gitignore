@@ -6,3 +6,9 @@ data/
 .env.local
 coverage/
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.gstack/
+apps/site/.ssr/

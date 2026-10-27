@@ -6,6 +6,7 @@ import type { AlertsDTO } from '@calleval/framework';
 import { usePal } from '../theme';
 import { apiSend, errMsg, qs, useApi } from '../api';
 import { ErrorState, Loading, PageHeader, SectionTitle } from '../components/ui';
+import { PlanNotice } from '../components/plan';
 import { PAGE_KEYS, PageKey, useStore } from '../store';
 
 const URG: Record<string, { color: string; variant: string }> = {
@@ -26,6 +27,7 @@ export function AlertsPage() {
   const rules = useApi<AlertsDTO>('/api/alerts?status=open');
 
   const header = (
+    <>
     <PageHeader
       eyebrow="AI and sales leads"
       title="Alerts"
@@ -37,6 +39,8 @@ export function AlertsPage() {
         </Group>
       }
     />
+    <PlanNotice feature="alerts" />
+    </>
   );
   if (a.error && !a.data) return <>{header}<ErrorState error={a.error} onRetry={a.reload} /></>;
   if (!a.data) return <>{header}<Loading /></>;

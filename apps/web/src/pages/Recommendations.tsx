@@ -7,6 +7,7 @@ import { usePal } from '../theme';
 import { apiGet, apiSend, errMsg, qs, useApi } from '../api';
 import { EmptyState, ErrorState, Loading, Mono, PageHeader, StatCard, fmtWhen, useLookups } from '../components/ui';
 import { useMeta, useStore } from '../store';
+import { NeedsTip, useCan } from '../components/access';
 
 type Status = RecommendationDTO['status'];
 const STATUS: Record<Status, { label: string; color: string; variant: string }> = {
@@ -25,6 +26,7 @@ export function RecommendationsPage() {
   const p = usePal();
   const meta = useMeta();
   const { params, go } = useStore();
+  const can = useCan();
   const { cellName, pName, sName } = useLookups();
   const [status, setStatus] = useState<string>(params.status ?? 'active');
   const [kind, setKind] = useState<string>('all');
@@ -86,7 +88,7 @@ export function RecommendationsPage() {
         eyebrow="Improve · AI team and sales leads"
         title="Recommendations"
         description="Concrete fixes drawn from the calls: prompt changes, tool and routing fixes, and taxonomy updates, each with the calls and turns that justify it and the cells it should move. Ship a fix, then verify it in the next version report."
-        right={<Button leftSection={genJob ? <IconRefresh size={16} /> : <IconBulb size={16} />} loading={!!genJob} onClick={generate}>Generate recommendations</Button>}
+        right={<NeedsTip perm="quality:manage"><Button leftSection={genJob ? <IconRefresh size={16} /> : <IconBulb size={16} />} loading={!!genJob} disabled={!can('quality:manage')} onClick={generate}>Generate recommendations</Button></NeedsTip>}
       />
 
       <SimpleGrid cols={{ base: 2, md: 5 }} mb="lg">
@@ -112,7 +114,7 @@ export function RecommendationsPage() {
           <Card padding="xl">
             <Text fw={650}>No recommendations in this view</Text>
             <Text size="sm" c="dimmed" mt={4}>Run a generation pass to turn the latest failing metrics, gate failures and Fix-first cells into proposed fixes.</Text>
-            <Button mt="md" size="xs" onClick={generate} loading={!!genJob}>Generate recommendations</Button>
+            <Button mt="md" size="xs" onClick={generate} loading={!!genJob} disabled={!can('quality:manage')}>Generate recommendations</Button>
           </Card>
         )
       )}

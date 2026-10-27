@@ -95,12 +95,31 @@ Three ways in:
 
 Re-sending an outcome updates it (keyed on `id`, or on lead, stage and time).
 
+## Lead finder (Apollo.io)
+
+Apollo.io fills the built-in CRM (turn it on in **Business setup**). Add an **Apollo.io** integration
+with an API key that has People Search and People Enrichment access, or set `APOLLO_API_KEY`.
+
+- **Find leads** (`POST /api/leadfinder/search`) calls `POST https://api.apollo.io/api/v1/mixed_people/api_search`
+  with the filters the ideal customer profile implies (titles, seniority, locations, company size,
+  keywords; previewed on the Business setup page). Search uses no Apollo credits and returns names,
+  titles and companies; new people become leads with consent `unknown`, and a person already in the CRM
+  (same Apollo id, email or phone) is only backfilled.
+- **Enrich** (`POST /api/leadfinder/enrich`) calls `POST /api/v1/people/bulk_match` ten people at a
+  time for leads missing an email or phone, oldest first, and stops at the credit cap you set (about 1
+  credit a person, plus 8 for a mobile number). Apollo sends phone numbers later to
+  `{PUBLIC_URL}/webhooks/apollo/{integration}/{secret}`, so they are requested only when `PUBLIC_URL` is
+  a public `https` address; otherwise emails and profile fields are filled.
+- Campaigns don't call consent-unknown leads unless **Business setup → Calling rules** allows it.
+  Record consent on each lead (opted in, existing customer) where you have it.
+
 ## Audio model (optional)
 
 Emotion trajectory, naturalness (MOS), prosody and delivery-tag metrics need audio models. Set
 `AUDIO_MODEL_URL` to a service implementing [the audio model contract](audio-model.md). Without it,
 the Emotion and realism dimension uses transcript-side measures where a recording exists, and drops
-out of the score where there is none.
+out of the score where there is none. Uploaded recordings are sent to the audio model from disk, live
+calls from the provider's recording.
 
 ## Claude (LLM judge)
 

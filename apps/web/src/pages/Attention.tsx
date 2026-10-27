@@ -5,12 +5,15 @@ import { DIMS, DimKey, type CellDTO, type MatrixDTO } from '@calleval/framework'
 import { useStore, useMeta } from '../store';
 import { scoreColor, usePal } from '../theme';
 import { filterQs, useApi } from '../api';
+import { NeedsTip, useCan } from '../components/access';
+import { GettingStartedCard } from '../components/Setup';
 import { Agg, AgentSelect, Bar, BandBadge, Delta, DirectionSelect, EmptyState, ErrorState, Loading, Mono, PageHeader, RangeSelect, SectionTitle, StatCard, aggregate } from '../components/ui';
 
 type Item = { key: string; kind: 'Dimension' | 'Persona' | 'Scenario' | 'Cell'; name: string; sub: string; v: number; n: number; impact: number; go: [any, Record<string, string>] };
 type AggP = (Agg & { prev: Agg | null }) | null;
 
 export function AttentionPage() {
+  const canManage = useCan()('quality:manage');
   const { filters, queue, setOwner, setStatus, setOpenAttention, go } = useStore();
   const meta = useMeta();
   const p = usePal();
@@ -247,8 +250,8 @@ export function AttentionPage() {
                       <Table.Td ta="right"><Mono fw={500} c={it.v < 50 ? p.warnText : undefined}>{it.v}</Mono></Table.Td>
                       <Table.Td ta="right"><Mono>{it.n.toLocaleString('en-US')}</Mono></Table.Td>
                       <Table.Td ta="right"><Mono>{it.impact.toLocaleString('en-US')}</Mono></Table.Td>
-                      <Table.Td><Select size="xs" aria-label={`Owner for ${it.name}`} value={queue.owners[it.key] ?? 'none'} onChange={(v) => setOwner(it.key, v ?? 'none')} data={[{ value: 'none', label: 'Unassigned' }, { value: 'ai', label: 'AI team' }, { value: 'sales', label: 'Sales' }, { value: 'tax', label: 'Taxonomy owner' }, { value: 'crm', label: 'CRM and data' }]} /></Table.Td>
-                      <Table.Td><Select size="xs" aria-label={`Status for ${it.name}`} value={status} onChange={(v) => setStatus(it.key, v ?? 'open')} data={[{ value: 'open', label: 'Open' }, { value: 'inv', label: 'Investigating' }, { value: 'prompt', label: 'Fix in next prompt' }, { value: 'routing', label: 'Routing fix' }, { value: 'done', label: 'Fixed · verify' }, { value: 'wont', label: 'Won’t fix' }]} /></Table.Td>
+                      <Table.Td><NeedsTip perm="quality:manage"><Select size="xs" disabled={!canManage} aria-label={`Owner for ${it.name}`} value={queue.owners[it.key] ?? 'none'} onChange={(v) => setOwner(it.key, v ?? 'none')} data={[{ value: 'none', label: 'Unassigned' }, { value: 'ai', label: 'AI team' }, { value: 'sales', label: 'Sales' }, { value: 'tax', label: 'Taxonomy owner' }, { value: 'crm', label: 'CRM and data' }]} /></NeedsTip></Table.Td>
+                      <Table.Td><NeedsTip perm="quality:manage"><Select size="xs" disabled={!canManage} aria-label={`Status for ${it.name}`} value={status} onChange={(v) => setStatus(it.key, v ?? 'open')} data={[{ value: 'open', label: 'Open' }, { value: 'inv', label: 'Investigating' }, { value: 'prompt', label: 'Fix in next prompt' }, { value: 'routing', label: 'Routing fix' }, { value: 'done', label: 'Fixed · verify' }, { value: 'wont', label: 'Won’t fix' }]} /></NeedsTip></Table.Td>
                     </Table.Tr>
                   );
                 })}
@@ -267,6 +270,8 @@ export function AttentionPage() {
 
 function Header({ line, setLine }: { line: string; setLine: (v: string) => void }) {
   return (
+    <>
+    <GettingStartedCard />
     <PageHeader
       eyebrow="AI and sales leads · Daily"
       title="Needs attention"
@@ -274,5 +279,6 @@ function Header({ line, setLine }: { line: string; setLine: (v: string) => void 
       right={<Group gap="sm" align="flex-end" wrap="wrap"><RangeSelect options={['30', '90']} /><DirectionSelect /><AgentSelect />
         <Select label="Attention line" size="sm" w={200} value={line} onChange={(v) => v && setLine(v)} data={[{ value: '70', label: 'Under 70 · below Good' }, { value: '50', label: 'Under 50 · Fail' }, { value: '85', label: 'Under 85 · below Excellent' }]} /></Group>}
     />
+    </>
   );
 }
