@@ -4,8 +4,9 @@ import { apiGet, apiSend, errMsg, usePoll } from './api';
 
 export type PageKey =
   | 'attention' | 'recommendations' | 'fix' | 'matrix' | 'calls' | 'version' | 'traces'
-  | 'funnel' | 'review' | 'taxonomy' | 'alerts' | 'scoring' | 'integrations' | 'audio';
-export const PAGE_KEYS: PageKey[] = ['attention', 'recommendations', 'fix', 'matrix', 'calls', 'version', 'traces', 'funnel', 'review', 'taxonomy', 'alerts', 'scoring', 'integrations', 'audio'];
+  | 'funnel' | 'review' | 'taxonomy' | 'alerts' | 'scoring' | 'integrations' | 'audio'
+  | 'business' | 'leads' | 'funnels' | 'campaigns' | 'improvement' | 'access' | 'billing' | 'compliance';
+export const PAGE_KEYS: PageKey[] = ['attention', 'recommendations', 'fix', 'matrix', 'calls', 'version', 'traces', 'funnel', 'review', 'taxonomy', 'alerts', 'scoring', 'integrations', 'audio', 'business', 'leads', 'funnels', 'campaigns', 'improvement', 'access', 'billing', 'compliance'];
 
 type QueueEntry = { owner?: string; status?: string };
 

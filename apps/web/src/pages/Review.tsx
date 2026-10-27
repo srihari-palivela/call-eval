@@ -6,6 +6,7 @@ import { usePal } from '../theme';
 import { apiSend, errMsg, qs, useApi } from '../api';
 import { EmptyState, ErrorState, Loading, Mono, PageHeader, StatCard, fmtWhen } from '../components/ui';
 import { useMeta, useStore } from '../store';
+import { useCan } from '../components/access';
 
 const KIND_LABEL: Record<ReviewItemDTO['kind'], string> = { tag: 'Low-confidence tag', gate: 'Gate failure', sample: 'Random sample', metric: 'Judged metric' };
 
@@ -54,6 +55,8 @@ export function ReviewPage() {
 function ReviewCard({ item, onDone, p }: { item: ReviewItemDTO; onDone: () => void; p: ReturnType<typeof usePal> }) {
   const meta = useMeta();
   const { go } = useStore();
+  // Reading the queue needs calls:read; deciding needs calls:review (the API refuses it otherwise).
+  const reviewer = useCan()('calls:review');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const isPersona = (item.tagKey ?? '').startsWith('persona');
@@ -107,19 +110,19 @@ function ReviewCard({ item, onDone, p }: { item: ReviewItemDTO; onDone: () => vo
             {(item.kind === 'tag' || item.kind === 'sample') && (
               <>
                 <Select label={options.length ? 'Correct value' : 'Persona'} w={260} searchable data={options.length ? options : personaOptions} value={value} onChange={setValue} />
-                <Button loading={busy} disabled={!value} onClick={() => resolve({ value: value === 'none' ? null : value })}>{item.kind === 'sample' ? 'Mark reviewed' : value === current ? 'Confirm tag' : 'Override tag'}</Button>
+                <Button loading={busy} disabled={!value || !reviewer} onClick={() => resolve({ value: value === 'none' ? null : value })}>{item.kind === 'sample' ? 'Mark reviewed' : value === current ? 'Confirm tag' : 'Override tag'}</Button>
               </>
             )}
             {item.kind === 'gate' && (
               <>
-                <Button color="accent" loading={busy} onClick={() => resolve({ gateConfirmed: true })}>Confirm gate failure</Button>
-                <Button variant="default" loading={busy} onClick={() => resolve({ gateConfirmed: false })}>Overturn · not a failure</Button>
+                <Button color="accent" loading={busy} disabled={!reviewer} onClick={() => resolve({ gateConfirmed: true })}>Confirm gate failure</Button>
+                <Button variant="default" loading={busy} disabled={!reviewer} onClick={() => resolve({ gateConfirmed: false })}>Overturn · not a failure</Button>
               </>
             )}
             {item.kind === 'metric' && (
               <>
                 <NumberInput label="Your score (0–100)" w={160} min={0} max={100} value={score} onChange={setScore} />
-                <Button loading={busy} disabled={score === ''} onClick={() => resolve({ value: String(score) })}>Save score</Button>
+                <Button loading={busy} disabled={score === '' || !reviewer} onClick={() => resolve({ value: String(score) })}>Save score</Button>
               </>
             )}
           </Group>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Badge, Box, Button, Card, Group, SegmentedControl, SimpleGrid, Stack, Table, Tabs, Text } from '@mantine/core';
+import { useEffect, useRef, useState } from 'react';
+import { Badge, Box, Button, Card, Group, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
 import { IconCheck } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Bar as RBar, BarChart, CartesianGrid, Cell as RCell, LabelList, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
@@ -7,7 +7,9 @@ import type { TaxonomyHealthDTO } from '@calleval/framework';
 import { usePal } from '../theme';
 import { apiSend, errMsg, useApi } from '../api';
 import { ErrorState, Legend, Loading, Mono, PageHeader, SectionTitle, StatCard, fmtWhen } from '../components/ui';
-import { useMeta } from '../store';
+import { TaxonomyEditor } from '../components/TaxonomyEditor';
+import { useMeta, useStore } from '../store';
+import { NeedsTip, useCan } from '../components/access';
 
 const f2 = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toFixed(2));
 const pc = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v * 100)}%`);
@@ -15,16 +17,20 @@ const pc = (v: number | null | undefined) => (v === null || v === undefined ? '�
 export function TaxonomyPage() {
   const p = usePal();
   const meta = useMeta();
+  const { params } = useStore();
   const [confTag, setConfTag] = useState<'persona' | 'scenario' | 'intent'>('persona');
-  const [tab, setTab] = useState<string | null>('personas');
   const [busy, setBusy] = useState<string | null>(null);
+  const can = useCan();
   const h = useApi<TaxonomyHealthDTO>('/api/taxonomy/health');
+  const editorRef = useRef<HTMLDivElement>(null);
+  const ready = !!h.data;
+  useEffect(() => { if (ready && params.copilot) editorRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [ready, params.copilot]);
 
   const header = (
     <PageHeader
       eyebrow="Taxonomy owner · Monthly"
-      title="Taxonomy health"
-      description="Whether personas and scenarios still describe the calls: the Unclassified and Other share, reviewer agreement, classifier confidence, and new clusters nobody has named yet."
+      title="Taxonomy"
+      description="The personas, scenarios and events calls are tagged with, and whether they still describe the calls: the Unclassified and Other share, reviewer agreement, classifier confidence, and new clusters nobody has named yet. Define your own below, by hand or with the co-pilot."
       right={h.data && <Badge variant="light" color="gray" size="lg" tt="none" fw={500}>Active version v{h.data.version} · last clustering run {h.data.lastClusterRun ? fmtWhen(h.data.lastClusterRun) : 'not yet'}</Badge>}
     />
   );
@@ -60,7 +66,6 @@ export function TaxonomyPage() {
   ) : null;
   const agreeOk = (d.agreement.persona ?? 0) >= 0.75 && (d.agreement.scenario ?? 0) >= 0.75;
   const matchOk = (d.classifierMatch.persona ?? 0) >= 0.85 && (d.classifierMatch.scenario ?? 0) >= 0.85;
-  const groups = Array.from(new Set(meta.eventTypes.map((e) => e.group)));
 
   return (
     <>
@@ -138,14 +143,14 @@ export function TaxonomyPage() {
         </Card>
 
         <Card>
-          <SectionTitle note="Call summaries clustered by meaning. A cluster with 20 or more calls is reviewed for the next version." right={<Button size="xs" variant="default" loading={busy === 'run'} onClick={runClusters}>Run clustering</Button>}>New clusters</SectionTitle>
+          <SectionTitle note="Call summaries clustered by meaning. A cluster with 20 or more calls is reviewed for the next version." right={<NeedsTip perm="quality:manage"><Button size="xs" variant="default" loading={busy === 'run'} disabled={!can('quality:manage')} onClick={runClusters}>Run clustering</Button></NeedsTip>}>New clusters</SectionTitle>
           {d.clusters.length === 0 && <Text size="sm" c="dimmed">No unnamed clusters found yet.</Text>}
           <Stack gap={0}>
             {d.clusters.map((c) => (
               <Group key={c.id} justify="space-between" wrap="nowrap" py="sm" style={{ borderBottom: `1px solid ${p.line}` }}>
                 <Stack gap={0} style={{ minWidth: 0 }}><Text size="sm" fw={600}>{c.label}</Text><Text size="xs" c="dimmed">{c.size} calls · nearest tag {c.nearest}</Text></Stack>
                 {c.size >= 20
-                  ? <Button size="xs" variant={c.proposed ? 'filled' : 'default'} loading={busy === c.id} leftSection={c.proposed ? <IconCheck size={14} /> : undefined} onClick={() => propose(c.id, c.proposed)} aria-pressed={c.proposed} style={{ flex: 'none' }}>{c.proposed ? 'Proposed for next version' : 'Propose for next version'}</Button>
+                  ? <Button size="xs" variant={c.proposed ? 'filled' : 'default'} loading={busy === c.id} disabled={!can('quality:manage')} leftSection={c.proposed ? <IconCheck size={14} /> : undefined} onClick={() => propose(c.id, c.proposed)} aria-pressed={c.proposed} style={{ flex: 'none' }}>{c.proposed ? 'Proposed for next version' : 'Propose for next version'}</Button>
                   : <Text size="xs" c="dimmed" style={{ flex: 'none' }}>Watching · under 20</Text>}
               </Group>
             ))}
@@ -153,55 +158,9 @@ export function TaxonomyPage() {
         </Card>
       </SimpleGrid>
 
-      <Card>
-        <SectionTitle note="A draft for the sales team to confirm. A change to a definition creates a new version, never an edit in place." right={d.versions.length > 0 ? <Group gap={6}>{d.versions.map((v) => <Badge key={v.version} variant={v.status === 'active' ? 'filled' : 'light'} color={v.status === 'active' ? 'ink' : 'gray'} tt="none">v{v.version} · {v.status}</Badge>)}</Group> : undefined}>Taxonomy v{d.version}</SectionTitle>
-        <Tabs value={tab} onChange={setTab}>
-          <Tabs.List mb="sm">
-            <Tabs.Tab value="personas">Personas</Tabs.Tab>
-            <Tabs.Tab value="scenarios">Scenarios</Tabs.Tab>
-            <Tabs.Tab value="events">Events</Tabs.Tab>
-            <Tabs.Tab value="facets">Facets</Tabs.Tab>
-          </Tabs.List>
-          <Tabs.Panel value="personas">
-            <Table.ScrollContainer minWidth={820}>
-              <Table>
-                <Table.Thead><Table.Tr><Table.Th w={56}>ID</Table.Th><Table.Th>Persona</Table.Th><Table.Th>Path</Table.Th><Table.Th>Identifying signals</Table.Th><Table.Th>Watch for</Table.Th></Table.Tr></Table.Thead>
-                <Table.Tbody>
-                  {[...meta.personas, meta.p0].map((r) => (
-                    <Table.Tr key={r.id}><Table.Td><Mono size="sm" c="dimmed">{r.id}</Mono></Table.Td><Table.Td><Text size="sm" fw={600}>{r.name}</Text></Table.Td><Table.Td><Text size="sm" c="dimmed">{r.path}</Text></Table.Td><Table.Td><Text size="sm">{r.signals}</Text></Table.Td><Table.Td><Text size="sm">{r.watch}</Text></Table.Td></Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Tabs.Panel>
-          <Tabs.Panel value="scenarios">
-            <Table.ScrollContainer minWidth={900}>
-              <Table>
-                <Table.Thead><Table.Tr><Table.Th w={56}>ID</Table.Th><Table.Th>Scenario</Table.Th><Table.Th>Typical trigger</Table.Th><Table.Th>Expected agent path</Table.Th><Table.Th>Success</Table.Th></Table.Tr></Table.Thead>
-                <Table.Tbody>
-                  {meta.scenarios.map((r) => (
-                    <Table.Tr key={r.id}><Table.Td><Mono size="sm" c="dimmed">{r.id}</Mono></Table.Td><Table.Td><Text size="sm" fw={600}>{r.name}</Text></Table.Td><Table.Td><Text size="sm">{r.trigger}</Text></Table.Td><Table.Td><Text size="sm">{r.path}</Text></Table.Td><Table.Td><Text size="sm">{r.success}</Text></Table.Td></Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Tabs.Panel>
-          <Tabs.Panel value="events">
-            <Table>
-              <Table.Thead><Table.Tr><Table.Th w={200}>Group</Table.Th><Table.Th>Events</Table.Th></Table.Tr></Table.Thead>
-              <Table.Tbody>{groups.map((g) => <Table.Tr key={g}><Table.Td><Text size="sm" fw={600}>{g}</Text></Table.Td><Table.Td><Text size="sm">{meta.eventTypes.filter((e) => e.group === g).map((e) => e.label.replace(/^Objection · /, '')).join(' · ')}</Text></Table.Td></Table.Tr>)}</Table.Tbody>
-            </Table>
-          </Tabs.Panel>
-          <Tabs.Panel value="facets">
-            <Table.ScrollContainer minWidth={640}>
-              <Table>
-                <Table.Thead><Table.Tr><Table.Th w={220}>Facet</Table.Th><Table.Th>Values</Table.Th><Table.Th>Source</Table.Th></Table.Tr></Table.Thead>
-                <Table.Tbody>{meta.facets.map((f) => <Table.Tr key={f.id}><Table.Td><Text size="sm" fw={600}>{f.name}</Text></Table.Td><Table.Td><Text size="sm">{f.values}</Text></Table.Td><Table.Td><Text size="sm" c="dimmed">{f.source}</Text></Table.Td></Table.Tr>)}</Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Tabs.Panel>
-        </Tabs>
-      </Card>
+      <div ref={editorRef} style={{ scrollMarginTop: 72 }}>
+        <TaxonomyEditor initialMode={params.copilot} onActivated={h.reload} />
+      </div>
     </>
   );
 }

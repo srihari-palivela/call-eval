@@ -5,18 +5,22 @@
   "description": "AI call evaluation platform: pulls ElevenLabs and Retell AI calls, scores them against the Call Evaluation Framework and recommends fixes.",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/web",
+    "apps/site"
   ],
   "scripts": {
-    "dev": "npm run dev -w @calleval/api & npm run dev -w @calleval/web",
-    "dev:api": "npm run dev -w @calleval/api",
+    "setup:api": "cd apps/api && uv sync",
+    "dev": "npm run dev:api & npm run dev:web",
+    "dev:api": "cd apps/api && uv run calleval serve --reload",
     "dev:web": "npm run dev -w @calleval/web",
-    "build": "npm run build -w @calleval/api && npm run build -w @calleval/web",
-    "start": "npm run start -w @calleval/api",
-    "worker": "npm run worker -w @calleval/api",
-    "seed:demo": "npm run seed:demo -w @calleval/api",
+    "build": "npm run build -w @calleval/web",
+    "build:site": "npm run build -w @calleval/site",
+    "start": "cd apps/api && uv run calleval serve",
+    "worker": "cd apps/api && uv run calleval worker",
+    "seed:demo": "cd apps/api && uv run calleval seed-demo",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present && npm run test:api",
+    "test:api": "cd apps/api && uv run pytest -q"
   },
   "engines": {
     "node": ">=20.10"

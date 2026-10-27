@@ -2,6 +2,8 @@
 // A change to any definition creates a new taxonomy version; the API stores versions in the
 // `taxonomy` table and seeds them from these defaults.
 
+import type { Checkpoint } from './paths';
+
 export const TAXONOMY_VERSION = '1.0';
 export const FRAMEWORK_VERSION = 'v1';
 
@@ -15,6 +17,10 @@ export type Persona = {
   watch: string;
   /** The persona's "watch for" check, reported per persona in the technical view. */
   checkLabel: string;
+  /** User-defined taxonomies: the framework persona whose built-in rules and checks this one inherits. */
+  basedOn?: string | null;
+  /** Caller phrases that identify the persona when no Claude key is set (the heuristic classifier). */
+  keywords?: string[];
 };
 
 export type Scenario = {
@@ -24,7 +30,13 @@ export type Scenario = {
   trigger: string;
   path: string;
   success: string;
+  /** User-defined taxonomies: the framework scenario whose built-in rules and checks this one inherits. */
+  basedOn?: string | null;
+  keywords?: string[];
+  /** The expected path as checkpoints; path adherence scores the share reached in order. */
+  checkpoints?: Checkpoint[];
 };
+
 
 export const PERSONAS: Persona[] = [
   { id: 'P1', name: 'Family end-user', path: 'Investor', signals: 'Buying to live in; mentions children, schools, space, community, a second bedroom', watch: 'Need fit on bedrooms and community', checkLabel: 'Offers matching stated bedrooms and community' },
@@ -57,7 +69,9 @@ export const SCENARIOS: Scenario[] = [
   { id: 'S12', name: 'Failed call', short: 'Failed', trigger: 'Voicemail, silence, dropped line, wrong number, language mismatch', path: 'End or leave a message quickly', success: 'Short, with nothing wrong claimed' },
 ];
 
-export type EventType = { id: string; label: string; group: 'Objections' | 'Caller behaviour' | 'Agent or system' | 'Outcome moments' };
+export type EventGroup = 'Objections' | 'Caller behaviour' | 'Agent or system' | 'Outcome moments';
+/** `system` events are detected by code and cannot be removed; the others are tagged by the classifier. */
+export type EventType = { id: string; label: string; group: EventGroup; basedOn?: string | null; keywords?: string[]; system?: boolean };
 
 export const EVENT_TYPES: EventType[] = [
   { id: 'objection_budget', label: 'Objection · budget', group: 'Objections' },

@@ -7,6 +7,7 @@ import { DIMS } from '@calleval/framework';
 import { bandOf, usePal } from '../theme';
 import { useStore } from '../store';
 import { apiSend, errMsg } from '../api';
+import { NeedsTip, useCan } from './access';
 
 export function PageHeader({ eyebrow, title, description, right }: { eyebrow: string; title: string; description: ReactNode; right?: ReactNode }) {
   return (
@@ -151,6 +152,7 @@ export function ErrorState({ error, onRetry }: { error: string; onRetry?: () => 
 export function EmptyState({ title = 'No calls in this slice yet', children }: { title?: string; children?: ReactNode }) {
   const { go, meta, reloadMeta } = useStore();
   const [busy, setBusy] = useState(false);
+  const can = useCan();
   const empty = meta?.dataMode === 'empty';
   const seed = () => {
     setBusy(true);
@@ -173,7 +175,7 @@ export function EmptyState({ title = 'No calls in this slice yet', children }: {
           {empty && (
             <Group gap="xs" mt={4}>
               <Button size="xs" onClick={() => go('integrations')}>Connect a provider</Button>
-              <Button size="xs" variant="default" loading={busy} onClick={seed}>Load demo data</Button>
+              <NeedsTip perm="settings:manage"><Button size="xs" variant="default" loading={busy} disabled={!can('settings:manage')} onClick={seed}>Load demo data</Button></NeedsTip>
             </Group>
           )}
         </Stack>

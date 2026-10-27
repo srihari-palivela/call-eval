@@ -7,6 +7,7 @@ import { usePal } from '../theme';
 import { apiSend, apiSendText, errMsg, useApi, usePoll } from '../api';
 import { ErrorState, Loading, Mono, PageHeader, SectionTitle, fmtWhen } from '../components/ui';
 import { useMeta, useStore } from '../store';
+import { NeedsTip, useCan } from '../components/access';
 
 type Provider = IntegrationDTO['provider'];
 type Form = { provider: Provider; name: string; apiKey: string; webhookSecret: string; agentIds: string; baseUrl: string; pollMinutes: number | string; enabled: boolean };
@@ -33,7 +34,16 @@ const PROVIDERS: Record<Provider, { label: string; keyHelp: string; secretHelp: 
     agentHelp: 'Not used for the CRM.',
     baseHelp: 'Base URL of the CRM API.',
   },
+  apollo: {
+    label: 'Apollo.io',
+    keyHelp: 'An Apollo API key with People Search and People Enrichment access (sent as x-api-key).',
+    secretHelp: 'Not needed.',
+    agentHelp: 'Not used for a lead finder.',
+    baseHelp: 'Leave empty for api.apollo.io.',
+  },
 };
+/** Voice platforms send calls; Treppan sends CRM outcomes; Apollo finds leads for the built-in CRM. */
+const isVoice = (p: Provider) => p === 'elevenlabs' || p === 'retell';
 const EL_REGIONS = [
   { value: '', label: 'Default · api.elevenlabs.io' },
   { value: 'https://api.us.elevenlabs.io', label: 'US · api.us.elevenlabs.io' },
@@ -54,6 +64,7 @@ export function IntegrationsPage() {
   usePoll(() => { jobs.reload(); if (running) list.reload(); }, running ? 3000 : 15000);
   const [adding, setAdding] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const can = useCan();
   const [csv, setCsv] = useState('');
   const [csvBusy, setCsvBusy] = useState(false);
 
@@ -73,8 +84,9 @@ export function IntegrationsPage() {
   };
 
   const items = list.data ?? [];
-  const voice = items.filter((i) => i.provider !== 'treppan');
+  const voice = items.filter((i) => isVoice(i.provider));
   const crm = items.filter((i) => i.provider === 'treppan');
+  const finders = items.filter((i) => i.provider === 'apollo');
 
   return (
     <>
@@ -82,13 +94,13 @@ export function IntegrationsPage() {
         eyebrow="Data · Admins"
         title="Integrations"
         description="Connect the voice platforms the agent runs on. Calls arrive by webhook as soon as they end and by a scheduled pull as a safety net; each one runs through the evaluation pipeline. CRM outcomes join on the lead ID."
-        right={<Button leftSection={<IconPlus size={16} />} onClick={() => setAdding(true)} disabled={adding}>Add integration</Button>}
+        right={<NeedsTip perm="integrations:manage"><Button leftSection={<IconPlus size={16} />} onClick={() => setAdding(true)} disabled={adding || !can('integrations:manage')}>Add integration</Button></NeedsTip>}
       />
 
       {meta.dataMode === 'empty' && (
         <Alert color="gray" variant="light" radius="lg" mb="lg" icon={<IconPlugConnected />} title="No calls yet">
           <Text size="sm">Add an ElevenLabs or Retell AI integration below, upload recordings under Audio logs, or load synthetic demo data to explore every view.</Text>
-          <Button mt="sm" size="xs" variant="default" loading={seeding} onClick={seed}>Load demo data</Button>
+          <NeedsTip perm="settings:manage"><Button mt="sm" size="xs" variant="default" loading={seeding} disabled={!can('settings:manage')} onClick={seed}>Load demo data</Button></NeedsTip>
         </Alert>
       )}
       {meta.dataMode === 'demo' && (
@@ -116,7 +128,7 @@ export function IntegrationsPage() {
           <Text size="sm" mb={4}>Paste a CSV export, or POST JSON to <Mono size="sm">/api/crm/outcomes</Mono>.</Text>
           <Textarea autosize minRows={4} maxRows={12} placeholder={CSV_SAMPLE} value={csv} onChange={(e) => setCsv(e.currentTarget.value)} styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 12 } }} />
           <Group gap="sm" mt="sm">
-            <Button size="xs" loading={csvBusy} disabled={!csv.trim()} onClick={importCsv}>Import outcomes</Button>
+            <NeedsTip perm="crm:write"><Button size="xs" loading={csvBusy} disabled={!csv.trim() || !can('crm:write')} onClick={importCsv}>Import outcomes</Button></NeedsTip>
             <Anchor component="button" size="xs" onClick={() => setCsv(CSV_SAMPLE)}>Use the example</Anchor>
           </Group>
           <Text size="xs" c="dimmed" mt="sm">Stages: meeting_booked, meeting_attended, site_visit, reservation, sale, broker_registered, broker_deal, advisor_rating. Attribution window: {meta.settings.attributionDays} days ({meta.settings.reservationAttributionDays} for reservations).</Text>
@@ -148,6 +160,12 @@ export function IntegrationsPage() {
           )}
         </Card>
       </SimpleGrid>
+
+      <Card mb="lg">
+        <SectionTitle note="Apollo.io finds people who match the ideal customer profile from Business setup and fills the built-in CRM; enrichment backfills emails, titles and, with a public HTTPS address, phone numbers. Found leads are consent-unknown until you record consent.">Lead finders</SectionTitle>
+        {finders.length === 0 && <Text size="sm" c="dimmed">No lead finder connected. Add an Apollo.io integration, or set APOLLO_API_KEY on the API.</Text>}
+        <Stack gap="sm">{finders.map((i) => <IntegrationCard key={i.id} item={i} compact onChanged={() => list.reload()} />)}</Stack>
+      </Card>
 
       <Card>
         <SectionTitle>Setting up a provider</SectionTitle>
@@ -212,12 +230,15 @@ function IntegrationCard({ item, onChanged, compact = false }: { item: Integrati
             <Badge variant={item.enabled ? 'filled' : 'outline'} color="ink" tt="none">{item.enabled ? 'Enabled' : 'Paused'}</Badge>
           </Group>
           <Text size="sm" c="dimmed">
-            {item.hasApiKey ? `Key ${item.apiKeyHint ?? 'set'}` : 'No API key'} · {item.provider === 'retell' ? 'webhooks signed with the key' : item.hasWebhookSecret ? 'webhook secret set' : 'no webhook secret'}
-            {item.provider !== 'treppan' && ` · ${item.agentIds.length ? `${item.agentIds.length} agent${item.agentIds.length > 1 ? 's' : ''}` : 'all agents'} · pulls every ${item.pollMinutes} min`}
+            {item.hasApiKey ? `Key ${item.apiKeyHint ?? 'set'}` : 'No API key'}
+            {item.provider === 'apollo' ? ' · searches from the ideal customer profile in Business setup' : ` · ${item.provider === 'retell' ? 'webhooks signed with the key' : item.hasWebhookSecret ? 'webhook secret set' : 'no webhook secret'}`}
+            {isVoice(item.provider) && ` · ${item.agentIds.length ? `${item.agentIds.length} agent${item.agentIds.length > 1 ? 's' : ''}` : 'all agents'} · pulls every ${item.pollMinutes} min`}
           </Text>
-          <Text size="sm">
-            {item.callsImported.toLocaleString('en-US')} {item.provider === 'treppan' ? 'outcomes' : 'calls'} imported · last sync {item.lastSyncAt ? fmtWhen(item.lastSyncAt) : 'never'}{item.lastSyncStatus ? ` · ${item.lastSyncStatus}` : ''}
-          </Text>
+          {item.provider !== 'apollo' && (
+            <Text size="sm">
+              {item.callsImported.toLocaleString('en-US')} {item.provider === 'treppan' ? 'outcomes' : 'calls'} imported · last sync {item.lastSyncAt ? fmtWhen(item.lastSyncAt) : 'never'}{item.lastSyncStatus ? ` · ${item.lastSyncStatus}` : ''}
+            </Text>
+          )}
           {item.lastError && <Text size="sm" c={p.warnText}>Last error: {item.lastError}</Text>}
         </Stack>
         <Group gap="xs" wrap="wrap">
@@ -229,7 +250,7 @@ function IntegrationCard({ item, onChanged, compact = false }: { item: Integrati
         </Group>
       </Group>
 
-      {item.provider !== 'treppan' && (
+      {isVoice(item.provider) && (
         <Box mt="sm">
           <Text size="xs" fw={600} c="dimmed" mb={2}>Webhook URL · paste into {prov.label}</Text>
           <Group gap={6} wrap="nowrap">
@@ -243,7 +264,7 @@ function IntegrationCard({ item, onChanged, compact = false }: { item: Integrati
 
       <Group gap="sm" mt="sm" align="flex-end" wrap="wrap">
         <Button size="xs" variant="default" loading={busy === 'test'} onClick={testIt}>Test connection</Button>
-        {item.provider !== 'treppan' && <>
+        {isVoice(item.provider) && <>
           <TextInput size="xs" type="date" label="Backfill since (optional)" value={since} onChange={(e) => setSince(e.currentTarget.value)} w={180} />
           <Button size="xs" loading={busy === 'sync'} disabled={!item.enabled} onClick={sync}>{since ? 'Backfill' : 'Sync now'}</Button>
         </>}
@@ -291,12 +312,12 @@ function IntegrationForm({ id, initial, hasKey = false, hasSecret = false, onCan
         <Select label="Provider" disabled={editing} value={f.provider} onChange={(v) => v && set('provider', v as Provider)} data={(Object.keys(PROVIDERS) as Provider[]).map((k) => ({ value: k, label: PROVIDERS[k].label }))} />
         <TextInput label="Name" placeholder={prov.label} value={f.name} onChange={(e) => set('name', e.currentTarget.value)} />
         <PasswordInput label="API key" description={prov.keyHelp} placeholder={editing && hasKey ? 'Leave empty to keep the stored key' : ''} value={f.apiKey} onChange={(e) => set('apiKey', e.currentTarget.value)} />
-        {f.provider !== 'retell' && <PasswordInput label="Webhook secret" description={prov.secretHelp} placeholder={editing && hasSecret ? 'Leave empty to keep the stored secret' : ''} value={f.webhookSecret} onChange={(e) => set('webhookSecret', e.currentTarget.value)} />}
-        {f.provider !== 'treppan' && <TextInput label="Agent IDs" description={prov.agentHelp} placeholder={f.provider === 'retell' ? 'agent_…' : 'agent_…'} value={f.agentIds} onChange={(e) => set('agentIds', e.currentTarget.value)} />}
+        {(f.provider === 'elevenlabs' || f.provider === 'treppan') && <PasswordInput label="Webhook secret" description={prov.secretHelp} placeholder={editing && hasSecret ? 'Leave empty to keep the stored secret' : ''} value={f.webhookSecret} onChange={(e) => set('webhookSecret', e.currentTarget.value)} />}
+        {isVoice(f.provider) && <TextInput label="Agent IDs" description={prov.agentHelp} placeholder="agent_…" value={f.agentIds} onChange={(e) => set('agentIds', e.currentTarget.value)} />}
         {f.provider === 'elevenlabs'
           ? <Select label="Region" description={prov.baseHelp} value={f.baseUrl} onChange={(v) => set('baseUrl', v ?? '')} data={EL_REGIONS} />
-          : <TextInput label="Base URL" description={prov.baseHelp} placeholder={f.provider === 'retell' ? 'https://api.retellai.com' : 'https://crm.example.com/api'} value={f.baseUrl} onChange={(e) => set('baseUrl', e.currentTarget.value)} />}
-        {f.provider !== 'treppan' && <NumberInput label="Pull every (minutes)" description="Safety-net poll for calls a webhook missed." min={5} max={1440} value={f.pollMinutes} onChange={(v) => set('pollMinutes', v)} />}
+          : <TextInput label="Base URL" description={prov.baseHelp} placeholder={f.provider === 'retell' ? 'https://api.retellai.com' : f.provider === 'apollo' ? 'https://api.apollo.io/api/v1' : 'https://crm.example.com/api'} value={f.baseUrl} onChange={(e) => set('baseUrl', e.currentTarget.value)} />}
+        {isVoice(f.provider) && <NumberInput label="Pull every (minutes)" description="Safety-net poll for calls a webhook missed." min={5} max={1440} value={f.pollMinutes} onChange={(v) => set('pollMinutes', v)} />}
       </SimpleGrid>
       <Switch label="Enabled" checked={f.enabled} onChange={() => set('enabled', !f.enabled)} mb="sm" />
       {err && <Text size="sm" c="var(--mantine-color-accent-filled)" mb="sm">{err}</Text>}
